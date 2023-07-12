@@ -1,9 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"os"
 )
 
 func main() {
-	fmt.Printf("Hi")
+	//initialize the db
+	dal, _ := newDal("db.db", uint64(os.Getpagesize()))
+
+	p := dal.allocateEmptyPage()
+	p.num = dal.getNextPage()
+	copy(p.data, "data")
+	dal.writePage(p)
 }

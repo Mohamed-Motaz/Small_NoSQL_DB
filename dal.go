@@ -9,6 +9,8 @@ import (
 type dal struct {
 	file     *os.File
 	pageSize uint64
+
+	*freelist
 }
 
 type pgnum uint64
@@ -26,6 +28,7 @@ func newDal(path string, pageSize uint64) (*dal, error) {
 	dal := &dal{
 		file,
 		pageSize,
+		newFreeList(),
 	}
 	return dal, nil
 }
