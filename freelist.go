@@ -1,17 +1,19 @@
 package main
 
+import "encoding/binary"
+
 //Data structure for keeping track of all free
 //and empty pages
 type freelist struct {
-	maxPage       pgnum   //holds the maxiumu page allocated. maxPage * pageSize = fileSize
+	maxPage       pgnum   //holds the maximum page allocated. maxPage * pageSize = fileSize
 	releasedPages []pgnum //pages that were allocated but now free
 }
 
-const initialPage = 0
+const metaPageNum = 0
 
 func newFreeList() *freelist {
 	return &freelist{
-		maxPage:       initialPage,
+		maxPage:       metaPageNum,
 		releasedPages: []pgnum{},
 	}
 }
@@ -30,4 +32,41 @@ func (fr *freelist) getNextPage() pgnum {
 
 func (fr *freelist) releasePage(page pgnum) {
 	fr.releasedPages = append(fr.releasedPages, page)
+}
+
+func (fr *freelist) serialize(buf []byte) {
+	pos := 0
+
+	//maxPage num
+	binary.LittleEndian.PutUint16(buf[pos:], uint16(fr.maxPage))
+	pos += 2
+
+	//releasedPages num
+	binary.LittleEndian.PutUint16(buf[pos:], uint16(len(fr.releasedPages)))
+	pos += 2
+
+	for _, pageNum := range fr.releasedPages {
+		binary.LittleEndian.PutUint64(buf[pos:], uint64(pageNum))
+		pos += pageNumSize
+	}
+}
+
+func (fr *freelist) deserialize(buf []byte) {
+	pos := 0
+
+	//maxPage num
+	fr.maxPage = pgnum(binary.LittleEndian.Uint16(buf[pos:]))
+	pos += 2
+
+	//releasePages num
+	realeasedPagesNum := int(binary.LittleEndian.Uint16(buf[pos:]))
+	pos += 2
+
+	//todo, I believe I should first empty the fr.releasedPages array befr
+	fr.releasedPages = make([]pgnum, 0)
+	for i := 0; i < realeasedPagesNum; i++ {
+		releasedPageNum := binary.LittleEndian.Uint64(buf[pos:])
+		fr.releasedPages = append(fr.releasedPages, pgnum(releasedPageNum))
+		pos += pageNumSize
+	}
 }
