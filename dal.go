@@ -9,7 +9,7 @@ import (
 //Data Access Layer
 type dal struct {
 	file     *os.File
-	pageSize uint64
+	pageSize int
 
 	*metaPage
 	*freelist
@@ -26,7 +26,7 @@ func newDal(path string) (*dal, error) {
 
 	dal := &dal{
 		metaPage: newEmptyMeta(),
-		pageSize: uint64(os.Getpagesize()),
+		pageSize: os.Getpagesize() / 4,
 	}
 
 	if _, err := os.Stat(path); err == nil {
@@ -94,7 +94,7 @@ func (d *dal) allocateEmptyPage() *page {
 func (d *dal) readPage(pageNum pgnum) (*page, error) {
 	p := d.allocateEmptyPage()
 
-	offsetToRead := uint64(pageNum) * d.pageSize
+	offsetToRead := int64(pageNum) * int64(d.pageSize)
 
 	_, err := d.file.ReadAt(p.data, int64(offsetToRead))
 	if err != nil {
@@ -104,7 +104,7 @@ func (d *dal) readPage(pageNum pgnum) (*page, error) {
 }
 
 func (d *dal) writePage(p *page) error {
-	offsetToWrite := uint64(p.num) * d.pageSize
+	offsetToWrite := int64(p.num) * int64(d.pageSize)
 	_, err := d.file.WriteAt(p.data, int64(offsetToWrite))
 	return err
 }
