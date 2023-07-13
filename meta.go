@@ -3,20 +3,20 @@ package main
 import "encoding/binary"
 
 const (
-	metaDataPageNum = 0
+	metaPageNum = 0
 )
 
-type metaPage struct {
+type meta struct {
 	root         pgnum
 	freelistPage pgnum
 }
 
-func newEmptyMeta() *metaPage {
-	return &metaPage{}
+func newEmptyMeta() *meta {
+	return &meta{}
 }
 
-//write metaPage data into buffer
-func (m *metaPage) serialize(buf []byte) {
+//write meta data into buffer
+func (m *meta) serialize(buf []byte) {
 	pos := 0
 
 	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.root))
@@ -26,8 +26,8 @@ func (m *metaPage) serialize(buf []byte) {
 	pos += pageNumSize
 }
 
-//read metaPage data into struct
-func (m *metaPage) deserialize(buf []byte) {
+//read meta data into struct
+func (m *meta) deserialize(buf []byte) {
 	pos := 0
 
 	m.root = pgnum(binary.LittleEndian.Uint64(buf[pos:]))

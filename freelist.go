@@ -2,31 +2,36 @@ package main
 
 import "encoding/binary"
 
-//Data structure for keeping track of all free
-//and empty pages
+// metaPage is the maximum pgnum that is used by the db for its own purposes. For now, only page 0 is used as the
+// header page. It means all other page numbers can be used.
+const metaPage = 0
+
+// freelist manages the manages free and used pages.
 type freelist struct {
-	maxPage       pgnum   //holds the maximum page allocated. maxPage * pageSize = fileSize
-	releasedPages []pgnum //pages that were allocated but now free
+	// maxPage holds the latest page num allocated. releasedPages holds all the ids that were released during
+	// delete. New page ids are first given from the releasedPageIDs to avoid growing the file. If it's empty, then
+	// maxPage is incremented and a new page is created thus increasing the file size.
+	maxPage       pgnum
+	releasedPages []pgnum
 }
 
-const metaPageNum = 0
-
-func newFreeList() *freelist {
+func newFreelist() *freelist {
 	return &freelist{
-		maxPage:       metaPageNum,
+		maxPage:       metaPage,
 		releasedPages: []pgnum{},
 	}
 }
 
+// getNextPage returns page ids for writing New page ids are first given from the releasedPageIDs to avoid growing
+// the file. If it's empty, then maxPage is incremented and a new page is created thus increasing the file size.
 func (fr *freelist) getNextPage() pgnum {
 	if len(fr.releasedPages) != 0 {
-		//get the last page
-		pgID := fr.releasedPages[len(fr.releasedPages)-1]
-		//remove it from the released pages
+		// Take the last element and remove it from the list
+		pageID := fr.releasedPages[len(fr.releasedPages)-1]
 		fr.releasedPages = fr.releasedPages[:len(fr.releasedPages)-1]
-		return pgID
+		return pageID
 	}
-	fr.maxPage++
+	fr.maxPage += 1
 	return fr.maxPage
 }
 
@@ -34,39 +39,35 @@ func (fr *freelist) releasePage(page pgnum) {
 	fr.releasedPages = append(fr.releasedPages, page)
 }
 
-func (fr *freelist) serialize(buf []byte) {
+func (fr *freelist) serialize(buf []byte) []byte {
 	pos := 0
 
-	//maxPage num
 	binary.LittleEndian.PutUint16(buf[pos:], uint16(fr.maxPage))
 	pos += 2
 
-	//releasedPages num
+	// released pages count
 	binary.LittleEndian.PutUint16(buf[pos:], uint16(len(fr.releasedPages)))
 	pos += 2
 
-	for _, pageNum := range fr.releasedPages {
-		binary.LittleEndian.PutUint64(buf[pos:], uint64(pageNum))
+	for _, page := range fr.releasedPages {
+		binary.LittleEndian.PutUint64(buf[pos:], uint64(page))
 		pos += pageNumSize
+
 	}
+	return buf
 }
 
 func (fr *freelist) deserialize(buf []byte) {
 	pos := 0
-
-	//maxPage num
 	fr.maxPage = pgnum(binary.LittleEndian.Uint16(buf[pos:]))
 	pos += 2
 
-	//releasePages num
-	realeasedPagesNum := int(binary.LittleEndian.Uint16(buf[pos:]))
+	// released pages count
+	releasedPagesCount := int(binary.LittleEndian.Uint16(buf[pos:]))
 	pos += 2
 
-	//todo, I believe I should first empty the fr.releasedPages array befr
-	fr.releasedPages = make([]pgnum, 0)
-	for i := 0; i < realeasedPagesNum; i++ {
-		releasedPageNum := binary.LittleEndian.Uint64(buf[pos:])
-		fr.releasedPages = append(fr.releasedPages, pgnum(releasedPageNum))
+	for i := 0; i < releasedPagesCount; i++ {
+		fr.releasedPages = append(fr.releasedPages, pgnum(binary.LittleEndian.Uint64(buf[pos:])))
 		pos += pageNumSize
 	}
 }
