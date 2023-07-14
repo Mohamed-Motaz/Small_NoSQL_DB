@@ -15,7 +15,6 @@ func main() {
 	dal, _ := newDal("mainTest", options)
 
 	c := newCollection([]byte("collection1"), dal.root)
-	c.dal = dal
 
 	_ = c.Put([]byte("Key1"), []byte("Value1"))
 	_ = c.Put([]byte("Key2"), []byte("Value2"))
