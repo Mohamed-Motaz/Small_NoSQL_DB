@@ -1,10 +1,14 @@
 package main
 
-import "bytes"
+import (
+	"bytes"
+	"encoding/binary"
+)
 
 type Collection struct {
-	name []byte
-	root pgnum
+	name    []byte
+	root    pgnum
+	counter uint64
 
 	// associated transaction
 	tx *tx
@@ -14,6 +18,43 @@ func newCollection(name []byte, root pgnum) *Collection {
 	return &Collection{
 		name: name,
 		root: root,
+	}
+}
+
+func newEmptyCollection() *Collection {
+	return &Collection{}
+}
+
+func (c *Collection) ID() uint64 {
+	if !c.tx.write {
+		return 0
+	}
+
+	id := c.counter
+	c.counter += 1
+	return id
+}
+
+func (c *Collection) serialize() *Item {
+	b := make([]byte, collectionSize)
+	leftPos := 0
+	binary.LittleEndian.PutUint64(b[leftPos:], uint64(c.root))
+	leftPos += pageNumSize
+	binary.LittleEndian.PutUint64(b[leftPos:], c.counter)
+	leftPos += counterSize
+	return newItem(c.name, b)
+}
+
+func (c *Collection) deserialize(item *Item) {
+	c.name = item.key
+
+	if len(item.value) != 0 {
+		leftPos := 0
+		c.root = pgnum(binary.LittleEndian.Uint64(item.value[leftPos:]))
+		leftPos += pageNumSize
+
+		c.counter = binary.LittleEndian.Uint64(item.value[leftPos:])
+		leftPos += counterSize
 	}
 }
 

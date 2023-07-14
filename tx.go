@@ -66,6 +66,69 @@ func (tx *tx) Commit() error {
 	return nil
 }
 
+func (tx *tx) getRootCollection() *Collection {
+	rootCollection := newEmptyCollection()
+	rootCollection.root = tx.db.root
+	rootCollection.tx = tx
+	return rootCollection
+}
+
+func (tx *tx) GetCollection(name []byte) (*Collection, error) {
+	rootCollection := tx.getRootCollection()
+	item, err := rootCollection.Find(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, nil
+	}
+
+	collection := newEmptyCollection()
+	collection.deserialize(item)
+	collection.tx = tx
+	return collection, nil
+}
+
+func (tx *tx) CreateCollection(name []byte) (*Collection, error) {
+	if !tx.write {
+		return nil, writeInsideReadTxErr
+	}
+
+	newCollectionPage, err := tx.db.writeNode(NewEmptyNode())
+	if err != nil {
+		return nil, err
+	}
+
+	newCollection := newEmptyCollection()
+	newCollection.name = name
+	newCollection.root = newCollectionPage.pageNum
+	return tx.createCollection(newCollection)
+}
+
+func (tx *tx) createCollection(collection *Collection) (*Collection, error) {
+	collection.tx = tx
+	collectionBytes := collection.serialize()
+
+	rootCollection := tx.getRootCollection()
+	err := rootCollection.Put(collection.name, collectionBytes.value)
+	if err != nil {
+		return nil, err
+	}
+
+	return collection, nil
+}
+func (tx *tx) DeleteCollection(name []byte) error {
+	if !tx.write {
+		return writeInsideReadTxErr
+	}
+
+	rootCollection := tx.getRootCollection()
+
+	return rootCollection.Remove(name)
+
+}
+
 func (tx *tx) newNode(items []*Item, childNodes []pgnum) *Node {
 	node := NewEmptyNode()
 	node.items = items
